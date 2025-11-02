@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Button, Form, Card, Alert, Spinner } from 'react-bootstrap';
+import { Button, Form, Card, Alert, Spinner, Collapse } from 'react-bootstrap';
 
 const SintomasForm = () => {
   const [sintomas, setSintomas] = useState([]);
   const [resultado, setResultado] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Estado para mostrar/ocultar formulario de datos personales
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [datosPersonales, setDatosPersonales] = useState({
+    nombre: '',
+    apellido: '',
+    edad: '',
+    genero: '',
+    barrio: '',
+    municipio: 'Buenaventura'
+  });
 
   const listaSintomas = [
     { value: 'fiebre_alta', label: 'Fiebre alta (>38°C)' },
@@ -51,92 +62,121 @@ const SintomasForm = () => {
         sintomas 
       });
       setResultado(res.data);
+      setMostrarFormulario(false); // Ocultar formulario al evaluar nuevos síntomas
     } catch (error) {
       console.error('Error al evaluar síntomas:', error);
-      setError('Error al conectar con el servidor. Verifica que el backend esté corriendo en el puerto 5000.');
+      setError('Error al conectar con el servidor.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRegistrar = async () => {
-  console.log('🚀 Iniciando registro de caso...');
-  console.log('📊 Datos actuales:', {
-    sintomas,
-    resultado,
-    tieneResultado: !!resultado,
-    tieneProbabilidades: !!resultado?.probabilidades
-  });
+  // Manejar cambios en el formulario de datos personales
+  const handleDatosChange = (e) => {
+    setDatosPersonales({
+      ...datosPersonales,
+      [e.target.name]: e.target.value
+    });
+  };
 
-  if (!navigator.geolocation) {
-    console.error('❌ Navegador no soporta geolocalización');
-    alert('Tu navegador no soporta geolocalización');
-    return;
-  }
+  // Mostrar formulario de datos personales
+  const handleMostrarFormulario = () => {
+    console.log('🔔 Mostrando formulario de datos personales');
+    setMostrarFormulario(true);
+  };
 
-  console.log('🔍 Solicitando ubicación al navegador...');
+  // Registrar caso con datos personales
+  const handleRegistrarConDatos = async () => {
+    console.log('🚀 Iniciando registro de caso con datos personales...');
+    console.log('📋 Datos a enviar:', datosPersonales);
+    
+    // Validar campos requeridos
+    if (!datosPersonales.nombre.trim()) {
+      alert('⚠️ Por favor ingresa tu nombre');
+      return;
+    }
+    
+    if (!datosPersonales.edad || datosPersonales.edad < 1 || datosPersonales.edad > 120) {
+      alert('⚠️ Por favor ingresa una edad válida (1-120)');
+      return;
+    }
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      try {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
+    if (!navigator.geolocation) {
+      alert('Tu navegador no soporta geolocalización');
+      return;
+    }
+
+    console.log('🔍 Solicitando ubicación al navegador...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          
+          console.log('✅ Ubicación obtenida:', { lat, lon });
+          
+          const datosEnviar = {
+            sintomas,
+            probabilidades: resultado.probabilidades,
+            lat,
+            lon,
+            nombre: datosPersonales.nombre.trim(),
+            apellido: datosPersonales.apellido.trim() || null,
+            edad: parseInt(datosPersonales.edad),
+            genero: datosPersonales.genero || null,
+            barrio: datosPersonales.barrio.trim() || null,
+            municipio: datosPersonales.municipio,
+            estado: 'pendiente'
+          };
+          
+          console.log('📤 Enviando datos al servidor:', datosEnviar);
+          
+          const response = await axios.post('http://localhost:5000/api/casos', datosEnviar);
+          
+          console.log('✅ Respuesta exitosa del servidor:', response.data);
+          alert(`✅ Caso registrado exitosamente con ID: ${response.data.caso?.id}\n\nGracias ${datosPersonales.nombre} por reportar tus síntomas.`);
+          
+          // Limpiar todo
+          setMostrarFormulario(false);
+          setSintomas([]);
+          setResultado(null);
+          setDatosPersonales({
+            nombre: '',
+            apellido: '',
+            edad: '',
+            genero: '',
+            barrio: '',
+            municipio: 'Buenaventura'
+          });
+          document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+          
+        } catch (error) {
+          console.error('❌ ERROR COMPLETO:', error);
+          console.error('📋 Error.response.data:', error.response?.data);
+          
+          const mensajeError = error.response?.data?.error || error.message || 'Error desconocido';
+          alert(`❌ Error al registrar el caso: ${mensajeError}`);
+        }
+      },
+      (error) => {
+        console.error('❌ Error de geolocalización:', error);
         
-        console.log('✅ Ubicación obtenida:', { lat, lon });
-        
-        const datosEnviar = {
-          sintomas,
-          probabilidades: resultado.probabilidades,
-          lat,
-          lon,
-          municipio: 'Buenaventura',
-          estado: 'pendiente'
+        const mensajes = {
+          1: 'Permiso denegado. Por favor permite el acceso a tu ubicación.',
+          2: 'Posición no disponible. Verifica tu conexión GPS.',
+          3: 'Tiempo de espera agotado.'
         };
         
-        console.log('📤 Enviando datos al servidor:', datosEnviar);
-        console.log('🌐 URL del servidor:', 'http://localhost:5000/api/casos');
-        
-        const response = await axios.post('http://localhost:5000/api/casos', datosEnviar);
-        
-        console.log('✅ Respuesta exitosa del servidor:', response.data);
-        alert('✅ Caso registrado exitosamente con ID: ' + response.data.caso?.id);
-        
-        // Limpiar formulario
-        setSintomas([]);
-        setResultado(null);
-        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-        
-      } catch (error) {
-        console.error('❌ ERROR COMPLETO:', error);
-        console.error('📋 Error.message:', error.message);
-        console.error('📋 Error.response:', error.response);
-        console.error('📋 Error.response.data:', error.response?.data);
-        console.error('📋 Error.response.status:', error.response?.status);
-        
-        const mensajeError = error.response?.data?.error || error.message || 'Error desconocido';
-        alert(`❌ Error al registrar el caso: ${mensajeError}`);
+        alert(`⚠️ ${mensajes[error.code] || error.message}`);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
       }
-    },
-    (error) => {
-      console.error('❌ Error de geolocalización:', error);
-      console.error('📋 Código de error:', error.code);
-      console.error('📋 Mensaje:', error.message);
-      
-      const mensajes = {
-        1: 'Permiso denegado. Por favor permite el acceso a tu ubicación.',
-        2: 'Posición no disponible. Verifica tu conexión GPS.',
-        3: 'Tiempo de espera agotado.'
-      };
-      
-      alert(`⚠️ ${mensajes[error.code] || error.message}`);
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  );
-};
+    );
+  };
 
   return (
     <Card className="shadow-lg">
@@ -213,23 +253,133 @@ const SintomasForm = () => {
                   
                   <Alert variant="warning" className="mb-3">
                     <small>
-                      ⚠️ {resultado.advertencia || 'Esta es una estimación preliminar. Consulta a un profesional de salud para un diagnóstico preciso.'}
+                      ⚠️ {resultado.advertencia || 'Esta es una estimación preliminar. Consulta a un profesional de salud.'}
                     </small>
                   </Alert>
 
-                  <div className="text-center">
+                  <div className="text-center mb-3">
                     <Button 
                       variant="success" 
                       size="lg"
-                      onClick={handleRegistrar}
+                      onClick={handleMostrarFormulario}
                     >
                       📍 Registrar Caso con Ubicación
                     </Button>
                   </div>
+
+                  {/* Formulario colapsable de datos personales */}
+                  <Collapse in={mostrarFormulario}>
+                    <div>
+                      <hr />
+                      <h5 className="text-center mb-3">👤 Datos Personales</h5>
+                      
+                      <Form>
+                        <div className="row">
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Nombre <span className="text-danger">*</span></Form.Label>
+                            <Form.Control
+                              type="text"
+                              name="nombre"
+                              value={datosPersonales.nombre}
+                              onChange={handleDatosChange}
+                              placeholder="Ingresa tu nombre"
+                              required
+                            />
+                          </div>
+
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Apellido</Form.Label>
+                            <Form.Control
+                              type="text"
+                              name="apellido"
+                              value={datosPersonales.apellido}
+                              onChange={handleDatosChange}
+                              placeholder="Ingresa tu apellido"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="row">
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Edad <span className="text-danger">*</span></Form.Label>
+                            <Form.Control
+                              type="number"
+                              name="edad"
+                              value={datosPersonales.edad}
+                              onChange={handleDatosChange}
+                              placeholder="Ingresa tu edad"
+                              min="1"
+                              max="120"
+                              required
+                            />
+                          </div>
+
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Género</Form.Label>
+                            <Form.Select
+                              name="genero"
+                              value={datosPersonales.genero}
+                              onChange={handleDatosChange}
+                            >
+                              <option value="">Selecciona...</option>
+                              <option value="masculino">Masculino</option>
+                              <option value="femenino">Femenino</option>
+                              <option value="otro">Otro</option>
+                              <option value="prefiero_no_decir">Prefiero no decir</option>
+                            </Form.Select>
+                          </div>
+                        </div>
+
+                        <div className="row">
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Barrio</Form.Label>
+                            <Form.Control
+                              type="text"
+                              name="barrio"
+                              value={datosPersonales.barrio}
+                              onChange={handleDatosChange}
+                              placeholder="Ingresa tu barrio"
+                            />
+                          </div>
+
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Municipio</Form.Label>
+                            <Form.Control
+                              type="text"
+                              name="municipio"
+                              value={datosPersonales.municipio}
+                              onChange={handleDatosChange}
+                              placeholder="Municipio"
+                            />
+                          </div>
+                        </div>
+
+                        <Alert variant="info" className="small mb-3">
+                          <strong>📍 Nota:</strong> Tu ubicación GPS será capturada automáticamente al registrar el caso.
+                        </Alert>
+
+                        <div className="text-center">
+                          <Button 
+                            variant="secondary" 
+                            className="me-2"
+                            onClick={() => setMostrarFormulario(false)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button 
+                            variant="success"
+                            onClick={handleRegistrarConDatos}
+                          >
+                            ✅ Registrar Caso Ahora
+                          </Button>
+                        </div>
+                      </Form>
+                    </div>
+                  </Collapse>
                 </>
               ) : (
                 <Alert variant="info">
-                  {resultado.mensaje || 'Baja probabilidad de enfermedades vectoriales. Monitorea tus síntomas.'}
+                  {resultado.mensaje || 'Baja probabilidad de enfermedades vectoriales.'}
                 </Alert>
               )}
             </Card.Body>
@@ -241,4 +391,3 @@ const SintomasForm = () => {
 };
 
 export default SintomasForm;
-

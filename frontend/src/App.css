@@ -1,0 +1,31 @@
+.App {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.card {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  border: none;
+  border-radius: 15px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-weight: bold;
+  transition: transform 0.2s;
+}
+
+.btn-primary:hover {
+  transform: scale(1.05);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-weight: bold;
+}

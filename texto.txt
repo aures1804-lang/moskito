@@ -13,7 +13,6 @@ def create_app():
     return app
 
 
-
 models.py
 from . import db  # Import relativo desde el paquete app
 from datetime import datetime
@@ -52,6 +51,7 @@ class Caso(db.Model):
             'estado': self.estado
         }
     
+        
     
 routes.py
 from flask import Blueprint, jsonify, request
@@ -90,7 +90,7 @@ def home():
 
 # Manejo de errores se mueve a run.py o se registra en el app principal
 
-scoring.py
+Soring.py
 
 ENFERMEDADES = {
     'dengue': {'fiebre_alta': 2, 'dolor_cabeza': 1, 'erupciones': 2, 'dolor_muscular': 2, 'nauseas': 1},
@@ -109,6 +109,7 @@ def calcular_probabilidades(sintomas):
         if prob > 0:
             probabilidades[enf] = round(prob, 2)
     return probabilidades
+
 
 
 .env

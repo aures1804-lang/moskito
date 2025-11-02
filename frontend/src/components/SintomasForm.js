@@ -60,41 +60,83 @@ const SintomasForm = () => {
   };
 
   const handleRegistrar = async () => {
-    if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización');
-      return;
-    }
+  console.log('🚀 Iniciando registro de caso...');
+  console.log('📊 Datos actuales:', {
+    sintomas,
+    resultado,
+    tieneResultado: !!resultado,
+    tieneProbabilidades: !!resultado?.probabilidades
+  });
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          
-          await axios.post('http://localhost:5000/api/casos', {
-            sintomas,
-            probabilidades: resultado.probabilidades,
-            lat,
-            lon,
-            municipio: 'Buenaventura',
-            estado: 'pendiente'
-          });
-          
-          alert('✅ Caso registrado exitosamente');
-          setSintomas([]);
-          setResultado(null);
-          document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-        } catch (error) {
-          console.error('Error al registrar caso:', error);
-          alert('❌ Error al registrar el caso');
-        }
-      },
-      (error) => {
-        console.error('Error de geolocalización:', error);
-        alert('⚠️ No se pudo obtener tu ubicación. Por favor habilita los permisos de ubicación.');
+  if (!navigator.geolocation) {
+    console.error('❌ Navegador no soporta geolocalización');
+    alert('Tu navegador no soporta geolocalización');
+    return;
+  }
+
+  console.log('🔍 Solicitando ubicación al navegador...');
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      try {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        
+        console.log('✅ Ubicación obtenida:', { lat, lon });
+        
+        const datosEnviar = {
+          sintomas,
+          probabilidades: resultado.probabilidades,
+          lat,
+          lon,
+          municipio: 'Buenaventura',
+          estado: 'pendiente'
+        };
+        
+        console.log('📤 Enviando datos al servidor:', datosEnviar);
+        console.log('🌐 URL del servidor:', 'http://localhost:5000/api/casos');
+        
+        const response = await axios.post('http://localhost:5000/api/casos', datosEnviar);
+        
+        console.log('✅ Respuesta exitosa del servidor:', response.data);
+        alert('✅ Caso registrado exitosamente con ID: ' + response.data.caso?.id);
+        
+        // Limpiar formulario
+        setSintomas([]);
+        setResultado(null);
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        
+      } catch (error) {
+        console.error('❌ ERROR COMPLETO:', error);
+        console.error('📋 Error.message:', error.message);
+        console.error('📋 Error.response:', error.response);
+        console.error('📋 Error.response.data:', error.response?.data);
+        console.error('📋 Error.response.status:', error.response?.status);
+        
+        const mensajeError = error.response?.data?.error || error.message || 'Error desconocido';
+        alert(`❌ Error al registrar el caso: ${mensajeError}`);
       }
-    );
-  };
+    },
+    (error) => {
+      console.error('❌ Error de geolocalización:', error);
+      console.error('📋 Código de error:', error.code);
+      console.error('📋 Mensaje:', error.message);
+      
+      const mensajes = {
+        1: 'Permiso denegado. Por favor permite el acceso a tu ubicación.',
+        2: 'Posición no disponible. Verifica tu conexión GPS.',
+        3: 'Tiempo de espera agotado.'
+      };
+      
+      alert(`⚠️ ${mensajes[error.code] || error.message}`);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+};
 
   return (
     <Card className="shadow-lg">

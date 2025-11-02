@@ -1,4 +1,4 @@
-from . import db  # Import relativo desde el paquete app
+from app import db  # Import relativo desde el paquete app
 from datetime import datetime
 
 class Caso(db.Model):
@@ -34,5 +34,4 @@ class Caso(db.Model):
             'genero': self.genero,
             'estado': self.estado
         }
-    
     

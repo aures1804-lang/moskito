@@ -1,16 +1,57 @@
-# Python
+# ============================
+# MOSKITO PROJECT .gitignore
+# Flask (Python) + React (Node)
+# ============================
+
+# --- ENTORNOS VIRTUALES ---
 venv/
+env/
+
+# --- PYTHON / FLASK ---
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
-
-# Node
-node_modules/
-.pnp
-.pnp.js
+instance/
 *.log
-
-# DB
+*.db
 *.sqlite
+*.sqlite3
+.env
+.env.*
+
+# --- ARCHIVOS DE CONFIGURACIÓN Y SECRETOS ---
+# Evita subir llaves o configuraciones sensibles
+*.pem
+*.key
+*.crt
+*.bak
+secrets.json
+
+# --- FRONTEND (React / Node) ---
+node_modules/
+build/
+dist/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+.cache/
+.DS_Store
+
+# --- CONFIGURACIONES DE EDITORES Y SISTEMA ---
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# --- OTROS TEMPORALES ---
+*.tmp
+*.log
+*.bak
+*.old

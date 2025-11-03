@@ -1,6 +1,9 @@
-from app import create_app
+from backend.app import create_app
 import os
 import sys
+
+# Asegurar que la carpeta raíz esté en el path de Python
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 print("=" * 50)
 print("🦟 MOSKITO - Sistema de Vigilancia Epidemiológica")

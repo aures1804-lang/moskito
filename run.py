@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+
 from backend.app import create_app
 import os
 import sys

@@ -1,5 +1,5 @@
-from app import db
 from datetime import datetime
+from . import db   # 👈 Importa db desde el paquete actual, no desde app
 
 class Caso(db.Model):
     __tablename__ = 'casos'

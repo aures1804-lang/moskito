@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from app import db
-from app.models import Caso
-from app.utils.scoring import calcular_probabilidades
+from . import db            # 👈 Usa el mismo db inicializado en __init__.py
+from .models import Caso     # 👈 Importa el modelo desde el mismo paquete
+from .utils.scoring import calcular_probabilidades
 
 api = Blueprint('api', __name__)
 

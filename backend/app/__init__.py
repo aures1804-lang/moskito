@@ -10,7 +10,20 @@ def create_app():
     load_dotenv()
 
     app = Flask(__name__)
-    CORS(app, resources={r"/*": {"origins": ["http://localhost:3000"]}})
+    
+    # ✅ CORS ampliado para permitir Render
+    CORS(app, resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "https://moskito-tur4.onrender.com",
+                "https://*.onrender.com",  # Cualquier subdominio de Render
+            ],
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL') or os.getenv('SQLALCHEMY_DATABASE_URI')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -22,7 +35,6 @@ def create_app():
         db.create_all()
         print("✓ Base de datos inicializada")
 
-    # 👇 Importa rutas después de crear la app y registrar la DB
     from backend.app.routes import api
     app.register_blueprint(api)
 

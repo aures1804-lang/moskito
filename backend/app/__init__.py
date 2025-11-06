@@ -17,6 +17,7 @@ def create_app():
             "origins": [
                 "http://localhost:3000",
                 "https://moskito-tur4.onrender.com",
+                "https://moskito-1.onrender.com",
                 "https://*.onrender.com",  # Cualquier subdominio de Render
             ],
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

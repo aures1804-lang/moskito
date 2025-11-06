@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Button, Form, Card, Alert, Spinner, Collapse } from 'react-bootstrap';
+import config from '../config';
 
 const SintomasForm = () => {
   const [sintomas, setSintomas] = useState([]);
@@ -58,8 +59,8 @@ const SintomasForm = () => {
     }
 
     try {
-      const res = await axios.post('http://localhost:5000/evaluar-sintomas', { 
-        sintomas 
+      const res = await axios.post(`${config.API_URL}/evaluar-sintomas`, { 
+         sintomas 
       });
       setResultado(res.data);
       setMostrarFormulario(false); // Ocultar formulario al evaluar nuevos síntomas
@@ -132,7 +133,7 @@ const SintomasForm = () => {
           
           console.log('📤 Enviando datos al servidor:', datosEnviar);
           
-          const response = await axios.post('http://localhost:5000/api/casos', datosEnviar);
+          const response = await axios.post(`${config.API_URL}/api/casos`, datosEnviar);
           
           console.log('✅ Respuesta exitosa del servidor:', response.data);
           alert(`✅ Caso registrado exitosamente con ID: ${response.data.caso?.id}\n\nGracias ${datosPersonales.nombre} por reportar tus síntomas.`);

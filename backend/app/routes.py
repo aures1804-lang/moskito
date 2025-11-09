@@ -1,22 +1,22 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from . import db            # 👈 Usa el mismo db inicializado en __init__.py
-from .models import Caso     # 👈 Importa el modelo desde el mismo paquete
+from . import db
+from .models import Caso
 from .utils.scoring import calcular_probabilidades
 
 api = Blueprint('api', __name__)
-
 # ==================== RUTA PRINCIPAL ====================
 @api.route('/')
 def home():
     return jsonify({
         "message": "🦟 API Moskito - Sistema de Vigilancia Epidemiológica",
         "status": "online",
-        "version": "1.0",
+        "version": "2.0",
         "endpoints": {
             "health": "/api/health",
             "evaluar": "/evaluar-sintomas",
-            "casos": "/api/casos"
+            "casos": "/api/casos",
+            "estadisticas": "/api/estadisticas"
         }
     })
 
@@ -24,7 +24,6 @@ def home():
 @api.route('/api/health', methods=['GET'])
 def health():
     try:
-        # Verificar conexión a la base de datos
         db.session.execute('SELECT 1')
         return jsonify({
             "status": "ok", 
@@ -77,10 +76,17 @@ def registrar_caso():
         print(f"\n{'='*60}")
         print(f"📥 DATOS RECIBIDOS PARA REGISTRO DE CASO")
         print(f"{'='*60}")
+        print(f"🆔 Identificación: {data.get('identificacion')}")
         print(f"👤 Nombre: {data.get('nombre')} {data.get('apellido')}")
+        print(f"📱 Teléfono: {data.get('telefono')}")
         print(f"🎂 Edad: {data.get('edad')}")
         print(f"⚧ Género: {data.get('genero')}")
+        print(f"🏥 EPS: {data.get('eps')}")
         print(f"🏘️ Barrio: {data.get('barrio')}")
+        print(f"🏠 Residencia Permanente: {data.get('es_residencia_permanente')}")
+        print(f"🌾 Zona Rural: {data.get('es_zona_rural')}")
+        if data.get('es_zona_rural'):
+            print(f"🌳 Nombre Zona: {data.get('nombre_zona_rural')}")
         print(f"🏙️ Municipio: {data.get('municipio')}")
         print(f"🩺 Síntomas: {data.get('sintomas')}")
         print(f"📊 Probabilidades: {data.get('probabilidades')}")
@@ -89,19 +95,30 @@ def registrar_caso():
         print(f"{'='*60}\n")
         
         # ============ VALIDACIONES ============
-        # Validar coordenadas
-        if not data.get('lat') or not data.get('lon'):
-            return jsonify({'error': 'Latitud y longitud son requeridas'}), 400
         
-        # Validar síntomas
-        if not data.get('sintomas'):
-            return jsonify({'error': 'Los síntomas son requeridos'}), 400
+        # 1. Validar identificación (OBLIGATORIO)
+        if not data.get('identificacion') or not data.get('identificacion').strip():
+            return jsonify({'error': 'El número de identificación es requerido'}), 400
         
-        # Validar nombre (REQUERIDO)
+        identificacion = data.get('identificacion').strip()
+        
+        # Verificar si la identificación ya existe
+        caso_existente = Caso.query.filter_by(identificacion=identificacion).first()
+        if caso_existente:
+            return jsonify({
+                'error': f'Ya existe un caso registrado con la identificación {identificacion}',
+                'caso_existente': {
+                    'id': caso_existente.id,
+                    'nombre': f"{caso_existente.nombre} {caso_existente.apellido or ''}",
+                    'fecha': caso_existente.timestamp.isoformat()
+                }
+            }), 400
+        
+        # 2. Validar nombre (OBLIGATORIO)
         if not data.get('nombre') or not data.get('nombre').strip():
             return jsonify({'error': 'El nombre es requerido'}), 400
         
-        # Validar edad (REQUERIDA)
+        # 3. Validar edad (OBLIGATORIO)
         edad = data.get('edad')
         if not edad:
             return jsonify({'error': 'La edad es requerida'}), 400
@@ -113,28 +130,49 @@ def registrar_caso():
         except (ValueError, TypeError):
             return jsonify({'error': 'La edad debe ser un número válido'}), 400
         
+        # 4. Validar coordenadas (OBLIGATORIO)
+        if not data.get('lat') or not data.get('lon'):
+            return jsonify({'error': 'Latitud y longitud son requeridas'}), 400
+        
+        # 5. Validar síntomas (OBLIGATORIO)
+        if not data.get('sintomas'):
+            return jsonify({'error': 'Los síntomas son requeridos'}), 400
+        
+        # 6. Validar teléfono (opcional pero con formato)
+        telefono = data.get('telefono', '').strip() if data.get('telefono') else None
+        if telefono and len(telefono) < 7:
+            return jsonify({'error': 'El teléfono debe tener al menos 7 dígitos'}), 400
+        
         # ============ CREAR CASO ============
         nuevo_caso = Caso(
-            # Síntomas y diagnóstico
+            # Identificación
+            identificacion=identificacion,
+            
+            # Datos personales
+            nombre=data.get('nombre').strip(),
+            apellido=data.get('apellido', '').strip() if data.get('apellido') else None,
+            telefono=telefono,
+            edad=edad,
+            genero=data.get('genero') if data.get('genero') else None,
+            
+            # Datos de salud
+            eps=data.get('eps'),
             sintomas=data.get('sintomas'),
             probabilidades=data.get('probabilidades'),
+            estado=data.get('estado', 'pendiente'),
             
             # Ubicación GPS
             lat=float(data.get('lat')),
             lon=float(data.get('lon')),
             
-            # Datos personales
-            nombre=data.get('nombre').strip(),
-            apellido=data.get('apellido', '').strip() if data.get('apellido') else None,
-            edad=edad,
-            genero=data.get('genero') if data.get('genero') else None,
-            
             # Ubicación geográfica
             municipio=data.get('municipio', 'Buenaventura').strip(),
             barrio=data.get('barrio', '').strip() if data.get('barrio') else None,
+            es_residencia_permanente=data.get('es_residencia_permanente', True),
             
-            # Estado del caso
-            estado=data.get('estado', 'pendiente')
+            # Zona rural
+            es_zona_rural=data.get('es_zona_rural', False),
+            nombre_zona_rural=data.get('nombre_zona_rural').strip() if data.get('nombre_zona_rural') and data.get('es_zona_rural') else None
         )
         
         # Guardar en la base de datos
@@ -142,10 +180,16 @@ def registrar_caso():
         db.session.commit()
         
         print(f"✅ Caso registrado exitosamente:")
-        print(f"   ID: {nuevo_caso.id}")
+        print(f"   ID Interno: {nuevo_caso.id}")
+        print(f"   Identificación: {nuevo_caso.identificacion}")
         print(f"   Paciente: {nuevo_caso.nombre} {nuevo_caso.apellido or ''}")
+        print(f"   Teléfono: {nuevo_caso.telefono or 'No proporcionado'}")
+        print(f"   EPS: {nuevo_caso.eps or 'No especificada'}")
         print(f"   Timestamp: {nuevo_caso.timestamp}")
         print(f"{'='*60}\n")
+        print(f"🌾 Zona Rural: {data.get('es_zona_rural')}")
+        if data.get('es_zona_rural'):
+            print(f"🌳 Nombre Zona: {data.get('nombre_zona_rural')}")
         
         return jsonify({
             'mensaje': 'Caso registrado exitosamente',
@@ -168,18 +212,27 @@ def registrar_caso():
 def get_casos():
     try:
         # Parámetros de filtrado opcionales
+        identificacion = request.args.get('identificacion')
         municipio = request.args.get('municipio')
         estado = request.args.get('estado')
+        eps = request.args.get('eps')
+        zona_rural = request.args.get('zona_rural')
         limit = request.args.get('limit', type=int)
         
         # Query base
         query = Caso.query
         
         # Aplicar filtros
+        if identificacion:
+            query = query.filter_by(identificacion=identificacion)
         if municipio:
             query = query.filter_by(municipio=municipio)
         if estado:
             query = query.filter_by(estado=estado)
+        if eps:
+            query = query.filter_by(eps=eps)
+        if zona_rural:
+            query = query.filter_by(es_zona_rural=(zona_rural.lower() == 'true'))
         
         # Ordenar por más reciente
         query = query.order_by(Caso.timestamp.desc())
@@ -198,6 +251,25 @@ def get_casos():
         print(f"❌ Error al obtener casos: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# ==================== BUSCAR CASO POR IDENTIFICACIÓN ====================
+@api.route('/api/casos/buscar/<string:identificacion>', methods=['GET'])
+def buscar_por_identificacion(identificacion):
+    try:
+        caso = Caso.query.filter_by(identificacion=identificacion).first()
+        if caso:
+            return jsonify({
+                'encontrado': True,
+                'caso': caso.to_dict()
+            })
+        else:
+            return jsonify({
+                'encontrado': False,
+                'mensaje': f'No se encontró ningún caso con la identificación {identificacion}'
+            }), 404
+    except Exception as e:
+        print(f"❌ Error al buscar caso: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 # ==================== OBTENER UN CASO ESPECÍFICO ====================
 @api.route('/api/casos/<int:caso_id>', methods=['GET'])
 def get_caso(caso_id):
@@ -214,9 +286,15 @@ def actualizar_caso(caso_id):
         caso = Caso.query.get_or_404(caso_id)
         data = request.json
         
-        # Actualizar solo el estado (puedes expandir esto)
+        # Campos actualizables
         if 'estado' in data:
             caso.estado = data['estado']
+        if 'eps' in data:
+            caso.eps = data['eps']
+        if 'telefono' in data:
+            caso.telefono = data['telefono']
+        if 'es_residencia_permanente' in data:
+            caso.es_residencia_permanente = data['es_residencia_permanente']
         
         db.session.commit()
         
@@ -269,6 +347,16 @@ def estadisticas():
             db.func.count(Caso.id)
         ).group_by(Caso.genero).all()
         
+        # Casos por EPS
+        casos_por_eps = db.session.query(
+            Caso.eps,
+            db.func.count(Caso.id)
+        ).group_by(Caso.eps).all()
+        
+        # Casos en zona rural
+        casos_zona_rural = Caso.query.filter_by(es_zona_rural=True).count()
+        casos_zona_urbana = Caso.query.filter_by(es_zona_rural=False).count()
+        
         # Promedio de edad
         edad_promedio = db.session.query(
             db.func.avg(Caso.edad)
@@ -279,6 +367,11 @@ def estadisticas():
             'por_municipio': dict(casos_por_municipio),
             'por_estado': dict(casos_por_estado),
             'por_genero': dict(casos_por_genero),
+            'por_eps': dict(casos_por_eps),
+            'por_zona': {
+                'rural': casos_zona_rural,
+                'urbana': casos_zona_urbana
+            },
             'edad_promedio': round(edad_promedio, 1) if edad_promedio else None
         })
     except Exception as e:
@@ -294,4 +387,3 @@ def not_found(error):
 def internal_error(error):
     db.session.rollback()
     return jsonify({'error': 'Error interno del servidor'}), 500
-

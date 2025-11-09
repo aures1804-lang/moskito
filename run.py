@@ -1,13 +1,8 @@
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
-
-from backend.app import create_app
-import os
-import sys
 
 # Asegurar que la carpeta raíz esté en el path de Python
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 print("=" * 50)
 print("🦟 MOSKITO - Sistema de Vigilancia Epidemiológica")
@@ -32,7 +27,14 @@ print("\n" + "=" * 50)
 print("🚀 Iniciando servidor Flask...")
 print("=" * 50)
 
-# Crear la aplicación usando el factory pattern
+# Cargar variables de entorno ANTES de importar la app
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=env_path)
+
+# AHORA importar create_app
+from backend.app import create_app
+
+# Crear la aplicación
 app = create_app()
 
 if __name__ == '__main__':
@@ -46,3 +48,4 @@ if __name__ == '__main__':
         port=5000,
         use_reloader=True
     )
+    

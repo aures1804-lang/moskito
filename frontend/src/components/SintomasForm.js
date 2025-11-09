@@ -12,13 +12,35 @@ const SintomasForm = () => {
   // Estado para mostrar/ocultar formulario de datos personales
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [datosPersonales, setDatosPersonales] = useState({
+    identificacion: '',
     nombre: '',
     apellido: '',
+    telefono: '',
     edad: '',
     genero: '',
+    eps: '',
     barrio: '',
-    municipio: 'Buenaventura'
+    municipio: 'Buenaventura',
+    es_residencia_permanente: true,
+    es_zona_rural: false,
+    nombre_zona_rural: ''
   });
+
+  // Lista de EPS
+  const listaEPS = [
+    'E.P.S. Sanitas S.A.',
+    'Emssanar E.S.S.',
+    'SURA EPS y Medicina Prepagada Suramericana S.A.',
+    'Familiar de Colombia',
+    'Mallamas',
+    'Mutual Ser',
+    'Nueva EPS S.A.',
+    'Salud Bolívar EPS S.A.S.',
+    'Salud Mía',
+    'Salud Total S.A. E.P.S.',
+    'Savia Salud EPS',
+    'SOS EPS. Servicio Occidental de Salud S.A.'
+  ];
 
   const listaSintomas = [
     { value: 'fiebre_alta', label: 'Fiebre alta (>38°C)' },
@@ -60,10 +82,10 @@ const SintomasForm = () => {
 
     try {
       const res = await axios.post(`${config.API_URL}/evaluar-sintomas`, { 
-         sintomas 
+        sintomas 
       });
       setResultado(res.data);
-      setMostrarFormulario(false); // Ocultar formulario al evaluar nuevos síntomas
+      setMostrarFormulario(false);
     } catch (error) {
       console.error('Error al evaluar síntomas:', error);
       setError('Error al conectar con el servidor.');
@@ -74,9 +96,10 @@ const SintomasForm = () => {
 
   // Manejar cambios en el formulario de datos personales
   const handleDatosChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setDatosPersonales({
       ...datosPersonales,
-      [e.target.name]: e.target.value
+      [name]: type === 'checkbox' ? checked : value
     });
   };
 
@@ -91,17 +114,45 @@ const SintomasForm = () => {
     console.log('🚀 Iniciando registro de caso con datos personales...');
     console.log('📋 Datos a enviar:', datosPersonales);
     
-    // Validar campos requeridos
-    if (!datosPersonales.nombre.trim()) {
-      alert('⚠️ Por favor ingresa tu nombre');
+    // ============ VALIDACIONES ============
+    
+    // Validar identificación
+    if (!datosPersonales.identificacion.trim()) {
+      alert('⚠️ Por favor ingresa el número de identificación (cédula)');
       return;
     }
     
+    if (datosPersonales.identificacion.trim().length < 5) {
+      alert('⚠️ El número de identificación debe tener al menos 5 dígitos');
+      return;
+    }
+    
+    // Validar nombre
+    if (!datosPersonales.nombre.trim()) {
+      alert('⚠️ Por favor ingresa el nombre');
+      return;
+    }
+    
+    // Validar edad
     if (!datosPersonales.edad || datosPersonales.edad < 1 || datosPersonales.edad > 120) {
       alert('⚠️ Por favor ingresa una edad válida (1-120)');
       return;
     }
+    
+    // Validar teléfono (opcional pero con formato)
+    if (datosPersonales.telefono && datosPersonales.telefono.trim().length < 7) {
+      alert('⚠️ El teléfono debe tener al menos 7 dígitos');
+      return;
+    }
+    
+    // Validar zona rural
+    if (datosPersonales.es_zona_rural && !datosPersonales.nombre_zona_rural.trim()) {
+      alert('⚠️ Por favor especifica el nombre de la zona rural o consejo comunitario');
+      return;
+    }
 
+    // ============ GEOLOCALIZACIÓN ============
+    
     if (!navigator.geolocation) {
       alert('Tu navegador no soporta geolocalización');
       return;
@@ -118,37 +169,54 @@ const SintomasForm = () => {
           console.log('✅ Ubicación obtenida:', { lat, lon });
           
           const datosEnviar = {
+            identificacion: datosPersonales.identificacion.trim(),
+            nombre: datosPersonales.nombre.trim(),
+            apellido: datosPersonales.apellido.trim() || null,
+            telefono: datosPersonales.telefono.trim() || null,
+            edad: parseInt(datosPersonales.edad),
+            genero: datosPersonales.genero || null,
+            eps: datosPersonales.eps || null,
             sintomas,
             probabilidades: resultado.probabilidades,
             lat,
             lon,
-            nombre: datosPersonales.nombre.trim(),
-            apellido: datosPersonales.apellido.trim() || null,
-            edad: parseInt(datosPersonales.edad),
-            genero: datosPersonales.genero || null,
-            barrio: datosPersonales.barrio.trim() || null,
             municipio: datosPersonales.municipio,
+            barrio: datosPersonales.barrio.trim() || null,
+            es_residencia_permanente: datosPersonales.es_residencia_permanente,
+            es_zona_rural: datosPersonales.es_zona_rural,
+            nombre_zona_rural: datosPersonales.es_zona_rural && datosPersonales.nombre_zona_rural 
+            ? datosPersonales.nombre_zona_rural.trim() 
+            : null,  // ← VERIFICA ESTA LÍNEA
             estado: 'pendiente'
           };
           
           console.log('📤 Enviando datos al servidor:', datosEnviar);
+          console.log('🌾 Es zona rural:', datosEnviar.es_zona_rural);
+          console.log('🌳 Nombre zona rural:', datosEnviar.nombre_zona_rural);
+          console.log('🌐 API URL:', config.API_URL);
           
           const response = await axios.post(`${config.API_URL}/api/casos`, datosEnviar);
           
           console.log('✅ Respuesta exitosa del servidor:', response.data);
-          alert(`✅ Caso registrado exitosamente con ID: ${response.data.caso?.id}\n\nGracias ${datosPersonales.nombre} por reportar tus síntomas.`);
+          alert(`✅ Caso registrado exitosamente\n\nIdentificación: ${datosPersonales.identificacion}\nNombre: ${datosPersonales.nombre}\n\nGracias por reportar tus síntomas.`);
           
           // Limpiar todo
           setMostrarFormulario(false);
           setSintomas([]);
           setResultado(null);
           setDatosPersonales({
+            identificacion: '',
             nombre: '',
             apellido: '',
+            telefono: '',
             edad: '',
             genero: '',
+            eps: '',
             barrio: '',
-            municipio: 'Buenaventura'
+            municipio: 'Buenaventura',
+            es_residencia_permanente: true,
+            es_zona_rural: false,
+            nombre_zona_rural: ''
           });
           document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
           
@@ -157,7 +225,7 @@ const SintomasForm = () => {
           console.error('📋 Error.response.data:', error.response?.data);
           
           const mensajeError = error.response?.data?.error || error.message || 'Error desconocido';
-          alert(`❌ Error al registrar el caso: ${mensajeError}`);
+          alert(`❌ Error al registrar el caso:\n\n${mensajeError}`);
         }
       },
       (error) => {
@@ -275,7 +343,23 @@ const SintomasForm = () => {
                       <h5 className="text-center mb-3">👤 Datos Personales</h5>
                       
                       <Form>
+                        {/* IDENTIFICACIÓN Y NOMBRE */}
                         <div className="row">
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Número de Identificación (Cédula) <span className="text-danger">*</span></Form.Label>
+                            <Form.Control
+                              type="text"
+                              name="identificacion"
+                              value={datosPersonales.identificacion}
+                              onChange={handleDatosChange}
+                              placeholder="Ej: 1234567890"
+                              required
+                            />
+                            <Form.Text className="text-muted">
+                              Sin puntos ni espacios
+                            </Form.Text>
+                          </div>
+
                           <div className="col-md-6 mb-3">
                             <Form.Label>Nombre <span className="text-danger">*</span></Form.Label>
                             <Form.Control
@@ -287,7 +371,10 @@ const SintomasForm = () => {
                               required
                             />
                           </div>
+                        </div>
 
+                        {/* APELLIDO Y TELÉFONO */}
+                        <div className="row">
                           <div className="col-md-6 mb-3">
                             <Form.Label>Apellido</Form.Label>
                             <Form.Control
@@ -298,8 +385,23 @@ const SintomasForm = () => {
                               placeholder="Ingresa tu apellido"
                             />
                           </div>
+
+                          <div className="col-md-6 mb-3">
+                            <Form.Label>Teléfono</Form.Label>
+                            <Form.Control
+                              type="tel"
+                              name="telefono"
+                              value={datosPersonales.telefono}
+                              onChange={handleDatosChange}
+                              placeholder="Ej: 3001234567"
+                            />
+                            <Form.Text className="text-muted">
+                              Mínimo 7 dígitos
+                            </Form.Text>
+                          </div>
                         </div>
 
+                        {/* EDAD Y GÉNERO */}
                         <div className="row">
                           <div className="col-md-6 mb-3">
                             <Form.Label>Edad <span className="text-danger">*</span></Form.Label>
@@ -331,6 +433,24 @@ const SintomasForm = () => {
                           </div>
                         </div>
 
+                        {/* EPS */}
+                        <div className="row">
+                          <div className="col-12 mb-3">
+                            <Form.Label>EPS (Entidad Promotora de Salud)</Form.Label>
+                            <Form.Select
+                              name="eps"
+                              value={datosPersonales.eps}
+                              onChange={handleDatosChange}
+                            >
+                              <option value="">Selecciona tu EPS...</option>
+                              {listaEPS.map((eps, index) => (
+                                <option key={index} value={eps}>{eps}</option>
+                              ))}
+                            </Form.Select>
+                          </div>
+                        </div>
+
+                        {/* BARRIO Y MUNICIPIO */}
                         <div className="row">
                           <div className="col-md-6 mb-3">
                             <Form.Label>Barrio</Form.Label>
@@ -354,6 +474,49 @@ const SintomasForm = () => {
                             />
                           </div>
                         </div>
+
+                        {/* RESIDENCIA PERMANENTE */}
+                        <div className="row">
+                          <div className="col-12 mb-3">
+                            <Form.Check
+                              type="checkbox"
+                              name="es_residencia_permanente"
+                              checked={datosPersonales.es_residencia_permanente}
+                              onChange={handleDatosChange}
+                              label="🏠 El barrio indicado es mi lugar de residencia permanente"
+                            />
+                          </div>
+                        </div>
+
+                        {/* ZONA RURAL */}
+                        <div className="row">
+                          <div className="col-12 mb-3">
+                            <Form.Check
+                              type="checkbox"
+                              name="es_zona_rural"
+                              checked={datosPersonales.es_zona_rural}
+                              onChange={handleDatosChange}
+                              label="🌾 Resido en zona rural"
+                            />
+                          </div>
+                        </div>
+
+                        {/* NOMBRE ZONA RURAL (solo si está marcado) */}
+                        {datosPersonales.es_zona_rural && (
+                          <div className="row">
+                            <div className="col-12 mb-3">
+                              <Form.Label>Nombre de la Zona Rural o Consejo Comunitario <span className="text-danger">*</span></Form.Label>
+                              <Form.Control
+                                type="text"
+                                name="nombre_zona_rural"
+                                value={datosPersonales.nombre_zona_rural}
+                                onChange={handleDatosChange}
+                                placeholder="Ej: Consejo Comunitario La Bocana"
+                                required={datosPersonales.es_zona_rural}
+                              />
+                            </div>
+                          </div>
+                        )}
 
                         <Alert variant="info" className="small mb-3">
                           <strong>📍 Nota:</strong> Tu ubicación GPS será capturada automáticamente al registrar el caso.

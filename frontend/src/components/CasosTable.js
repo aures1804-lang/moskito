@@ -9,6 +9,8 @@ const CasosTable = () => {
   const [error, setError] = useState(null);
   const [filtroMunicipio, setFiltroMunicipio] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroEPS, setFiltroEPS] = useState('');
+  const [filtroZonaRural, setFiltroZonaRural] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [actualizandoEstado, setActualizandoEstado] = useState(null);
 
@@ -54,7 +56,7 @@ const CasosTable = () => {
       ));
       
       // Mostrar mensaje de éxito
-      alert(`✅ Estado del caso #${casoId} actualizado a: ${nuevoEstado}`);
+      alert(`✅ Estado del caso actualizado a: ${nuevoEstado}`);
       
     } catch (error) {
       console.error('❌ Error al actualizar estado:', error);
@@ -68,16 +70,23 @@ const CasosTable = () => {
   const casosFiltrados = casos.filter(caso => {
     const matchMunicipio = filtroMunicipio === '' || caso.municipio === filtroMunicipio;
     const matchEstado = filtroEstado === '' || caso.estado === filtroEstado;
+    const matchEPS = filtroEPS === '' || caso.eps === filtroEPS;
+    const matchZonaRural = filtroZonaRural === '' || 
+      (filtroZonaRural === 'rural' && caso.es_zona_rural) ||
+      (filtroZonaRural === 'urbana' && !caso.es_zona_rural);
+    
     const matchBusqueda = busqueda === '' || 
       caso.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
       caso.apellido?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      caso.id?.toString().includes(busqueda);
+      caso.identificacion?.toString().includes(busqueda) ||
+      caso.telefono?.includes(busqueda);
     
-    return matchMunicipio && matchEstado && matchBusqueda;
+    return matchMunicipio && matchEstado && matchEPS && matchZonaRural && matchBusqueda;
   });
 
-  // Obtener lista única de municipios
+  // Obtener listas únicas para filtros
   const municipiosUnicos = [...new Set(casos.map(c => c.municipio).filter(Boolean))];
+  const epsUnicos = [...new Set(casos.map(c => c.eps).filter(Boolean))];
 
   // Función para obtener color del badge según enfermedad
   const getEnfermedadColor = (probabilidades) => {
@@ -222,19 +231,22 @@ const CasosTable = () => {
           <Card.Body>
             <h6 className="mb-3">🔍 Filtros</h6>
             <div className="row g-3">
-              <div className="col-md-4">
+              <div className="col-md-3">
                 <InputGroup>
                   <InputGroup.Text>🔎</InputGroup.Text>
                   <Form.Control
                     type="text"
-                    placeholder="Buscar por nombre o ID..."
+                    placeholder="Buscar por cédula, nombre o teléfono..."
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                   />
                 </InputGroup>
+                <Form.Text className="text-muted">
+                  Busca por número de identificación, nombre o teléfono
+                </Form.Text>
               </div>
               
-              <div className="col-md-4">
+              <div className="col-md-2">
                 <Form.Select
                   value={filtroMunicipio}
                   onChange={(e) => setFiltroMunicipio(e.target.value)}
@@ -246,7 +258,30 @@ const CasosTable = () => {
                 </Form.Select>
               </div>
 
-              <div className="col-md-4">
+              <div className="col-md-2">
+                <Form.Select
+                  value={filtroEPS}
+                  onChange={(e) => setFiltroEPS(e.target.value)}
+                >
+                  <option value="">Todas las EPS</option>
+                  {epsUnicos.map((eps, index) => (
+                    <option key={index} value={eps}>{eps}</option>
+                  ))}
+                </Form.Select>
+              </div>
+
+              <div className="col-md-2">
+                <Form.Select
+                  value={filtroZonaRural}
+                  onChange={(e) => setFiltroZonaRural(e.target.value)}
+                >
+                  <option value="">Zona: Todas</option>
+                  <option value="urbana">🏙️ Urbana</option>
+                  <option value="rural">🌾 Rural</option>
+                </Form.Select>
+              </div>
+
+              <div className="col-md-3">
                 <Form.Select
                   value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}
@@ -260,7 +295,7 @@ const CasosTable = () => {
               </div>
             </div>
 
-            {(busqueda || filtroMunicipio || filtroEstado) && (
+            {(busqueda || filtroMunicipio || filtroEstado || filtroEPS || filtroZonaRural) && (
               <div className="text-end mt-2">
                 <Button 
                   variant="link" 
@@ -269,6 +304,8 @@ const CasosTable = () => {
                     setBusqueda('');
                     setFiltroMunicipio('');
                     setFiltroEstado('');
+                    setFiltroEPS('');
+                    setFiltroZonaRural('');
                   }}
                 >
                   ✖️ Limpiar filtros
@@ -301,10 +338,11 @@ const CasosTable = () => {
             <Table striped bordered hover>
               <thead className="table-primary">
                 <tr>
-                  <th className="text-center">ID</th>
+                  <th className="text-center">Identificación</th>
                   <th>Paciente</th>
+                  <th>Contacto</th>
                   <th>Edad</th>
-                  <th>Género</th>
+                  <th>EPS</th>
                   <th>Ubicación</th>
                   <th>Enfermedad Probable</th>
                   <th>Fecha</th>
@@ -315,27 +353,54 @@ const CasosTable = () => {
                 {casosFiltrados.map((caso) => (
                   <tr key={caso.id}>
                     <td className="text-center">
-                      <strong>#{caso.id}</strong>
+                      <strong className="text-primary">{caso.identificacion}</strong>
+                      <div><small className="text-muted">ID: #{caso.id}</small></div>
                     </td>
                     <td>
                       <strong>{caso.nombre}</strong> {caso.apellido}
+                      <div>
+                        <small className="text-capitalize">
+                          {caso.genero ? `${caso.genero}` : 'N/A'}
+                        </small>
+                      </div>
                     </td>
-                    <td>{caso.edad || 'N/A'}</td>
                     <td>
-                      {caso.genero ? (
-                        <span className="text-capitalize">{caso.genero}</span>
+                      {caso.telefono ? (
+                        <>
+                          <div>📱 {caso.telefono}</div>
+                        </>
                       ) : (
-                        'N/A'
+                        <small className="text-muted">Sin teléfono</small>
+                      )}
+                    </td>
+                    <td className="text-center">{caso.edad || 'N/A'}</td>
+                    <td>
+                      {caso.eps ? (
+                        <small>{caso.eps}</small>
+                      ) : (
+                        <small className="text-muted">Sin EPS</small>
                       )}
                     </td>
                     <td>
+                      {caso.es_zona_rural && (
+                        <div>
+                          <Badge bg="success" className="mb-1">
+                            🌾 Zona Rural
+                          </Badge>
+                          {caso.nombre_zona_rural && (
+                            <div><small>{caso.nombre_zona_rural}</small></div>
+                          )}
+                        </div>
+                      )}
                       {caso.barrio && <div><small>🏘️ {caso.barrio}</small></div>}
                       <div><small>🏙️ {caso.municipio || 'N/A'}</small></div>
-                      <div>
-                        <small className="text-muted">
-                          📍 {caso.lat?.toFixed(4)}, {caso.lon?.toFixed(4)}
-                        </small>
-                      </div>
+                      {!caso.es_residencia_permanente && (
+                        <div>
+                          <Badge bg="warning" text="dark" className="mt-1">
+                            <small>No es residencia</small>
+                          </Badge>
+                        </div>
+                      )}
                     </td>
                     <td>
                       <Badge bg={getEnfermedadColor(caso.probabilidades)}>
@@ -368,23 +433,35 @@ const CasosTable = () => {
             <Card.Body>
               <h6 className="mb-3">📈 Estadísticas Rápidas</h6>
               <div className="row text-center">
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <h4 className="text-primary">{casos.length}</h4>
                   <small className="text-muted">Total Casos</small>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <h4 className="text-warning">
                     {casos.filter(c => c.estado === 'pendiente').length}
                   </h4>
                   <small className="text-muted">Pendientes</small>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <h4 className="text-success">
                     {casos.filter(c => c.estado === 'confirmado').length}
                   </h4>
                   <small className="text-muted">Confirmados</small>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
+                  <h4 className="text-success">
+                    {casos.filter(c => c.es_zona_rural).length}
+                  </h4>
+                  <small className="text-muted">Zona Rural</small>
+                </div>
+                <div className="col-md-2">
+                  <h4 className="text-info">
+                    {casos.filter(c => c.telefono).length}
+                  </h4>
+                  <small className="text-muted">Con Teléfono</small>
+                </div>
+                <div className="col-md-2">
                   <h4 className="text-info">
                     {Math.round(casos.reduce((acc, c) => acc + (c.edad || 0), 0) / casos.length) || 0}
                   </h4>
@@ -400,3 +477,10 @@ const CasosTable = () => {
 };
 
 export default CasosTable;
+
+
+
+
+
+
+
